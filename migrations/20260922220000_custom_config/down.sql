@@ -1,0 +1,1 @@
+ALTER TABLE dev_caloptreyx_reverseproxy_proxies DROP COLUMN advanced_config;

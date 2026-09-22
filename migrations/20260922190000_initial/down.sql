@@ -1,0 +1,4 @@
+DROP TABLE dev_caloptreyx_reverseproxy_cleanup;
+DROP TABLE dev_caloptreyx_reverseproxy_issuances;
+DROP TABLE dev_caloptreyx_reverseproxy_proxies;
+ALTER TABLE servers DROP COLUMN reverse_proxy_limit;
