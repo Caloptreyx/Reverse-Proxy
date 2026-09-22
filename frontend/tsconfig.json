@@ -7,9 +7,17 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "paths": {
-      "@/*": ["../../calagopus-dev/frontend/src/*", "../../../frontend/src/*"]
+      "@/*": [
+        "../../calagopus-dev/frontend/src/*",
+        "../../../frontend/src/*"
+      ]
     },
-    "types": ["../../../frontend/src/vite-env.d.ts"]
+    "skipLibCheck": true,
+    "resolvePackageJsonExports": true
   },
-  "include": ["src"]
+  "include": [
+    "src",
+    "../../calagopus-dev/frontend/src/vite-env.d.ts",
+    "../../../frontend/src/vite-env.d.ts"
+  ]
 }
