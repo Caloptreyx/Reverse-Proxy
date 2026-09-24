@@ -46,12 +46,14 @@ export default function ProxyModal({
   serverUuid,
   options,
   proxy,
+  allocationUuid: initialAllocationUuid,
   onSaved,
   ...props
 }: Omit<ModalProps, 'children'> & {
   serverUuid: string;
   options: ServerProxies['options'];
   proxy?: ReverseProxy;
+  allocationUuid?: string;
   onSaved: () => void;
 }) {
   const { t: tExt, tReact: tExtReact } = useExtTranslations();
@@ -91,7 +93,7 @@ export default function ProxyModal({
     setDomain('');
     setManagedDomainUuid(options.managedDomains[0]?.uuid ?? null);
     setName('');
-    setAllocationUuid(proxy?.allocation?.uuid ?? null);
+    setAllocationUuid(proxy?.allocation?.uuid ?? initialAllocationUuid ?? null);
     setScheme(proxy?.forwardScheme ?? options.defaults.forwardScheme);
     setFlags(pickFlags(proxy ?? options.defaults));
     setCertificateMode(proxy?.certificateMode ?? defaultMode);

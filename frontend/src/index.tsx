@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Extension, ExtensionContext } from 'shared';
 import { z } from 'zod';
 import { type FieldDef, insertFieldsAfter } from '@/elements/form-engine/index.ts';
+import AllocationProxyAction from './components/AllocationProxyAction.tsx';
 import AdminConfigurationPage from './pages/admin/AdminConfigurationPage.tsx';
 import ServerProxiesPage from './pages/server/ServerProxiesPage.tsx';
 import { getExtTranslations } from './translations.ts';
@@ -20,6 +21,14 @@ class CaloptreyxReverseProxyExtension extends Extension {
         element: ServerProxiesPage,
         permission: 'proxies.read',
       }),
+    );
+
+    ctx.extensionRegistry.enterPages((pages) =>
+      pages.enterServer((server) =>
+        server.enterNetwork((network) =>
+          network.enterAllocationContextMenu((menu) => menu.addComponentItemInterceptor(AllocationProxyAction)),
+        ),
+      ),
     );
 
     ctx.extensionRegistry.enterPermissionIcons((icons) =>
