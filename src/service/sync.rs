@@ -28,11 +28,9 @@ pub async fn pass(ctx: &Ctx) -> Result<(), anyhow::Error> {
     let client = ctx.client()?;
     let snapshot = reconcile::snapshot(ctx, &client).await?;
 
-    if ctx.settings.auto_reconcile {
-        for item in &snapshot.items {
-            if let Err(err) = reconcile::fix(ctx, &client, &item.id).await {
-                tracing::warn!(item = %item.id, "automatic reconcile failed: {err:?}");
-            }
+    for item in &snapshot.items {
+        if let Err(err) = reconcile::fix(ctx, &client, &item.id).await {
+            tracing::warn!(item = %item.id, "automatic reconcile failed: {err:?}");
         }
     }
 

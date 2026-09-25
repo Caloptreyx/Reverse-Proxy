@@ -18,6 +18,7 @@ import { useTranslations } from '@/providers/TranslationProvider.tsx';
 import {
   createProxy,
   DOMAIN_REGEX,
+  initialFlags,
   LABEL_REGEX,
   type ProxyFlags,
   type ReverseProxy,
@@ -71,16 +72,15 @@ export default function ProxyModal({
       ? [{ value: 'custom', label: tExt('pages.server.modal.certificateCustom', {}) }]
       : []),
   ];
-  const defaultKind: Kind = options.allowCustomDomains || !canManaged ? 'custom' : 'managed';
 
   const [loading, setLoading] = useState(false);
-  const [kind, setKind] = useState<Kind>(defaultKind);
+  const [kind, setKind] = useState<Kind>('custom');
   const [domain, setDomain] = useState('');
   const [managedDomainUuid, setManagedDomainUuid] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [allocationUuid, setAllocationUuid] = useState<string | null>(null);
-  const [scheme, setScheme] = useState<Scheme>(options.defaults.forwardScheme);
-  const [flags, setFlags] = useState<ProxyFlags>(pickFlags(options.defaults));
+  const [scheme, setScheme] = useState<Scheme>('http');
+  const [flags, setFlags] = useState<ProxyFlags>(initialFlags(options.defaults));
   const [certificateMode, setCertificateMode] = useState<CertificateMode>(defaultMode);
   const [certificate, setCertificate] = useState('');
   const [certificateKey, setCertificateKey] = useState('');
@@ -89,13 +89,13 @@ export default function ProxyModal({
 
   useEffect(() => {
     if (!props.opened) return;
-    setKind(defaultKind);
+    setKind('custom');
     setDomain('');
     setManagedDomainUuid(options.managedDomains[0]?.uuid ?? null);
     setName('');
     setAllocationUuid(proxy?.allocation?.uuid ?? initialAllocationUuid ?? null);
-    setScheme(proxy?.forwardScheme ?? options.defaults.forwardScheme);
-    setFlags(pickFlags(proxy ?? options.defaults));
+    setScheme(proxy?.forwardScheme ?? 'http');
+    setFlags(proxy ? pickFlags(proxy) : initialFlags(options.defaults));
     setCertificateMode(proxy?.certificateMode ?? defaultMode);
     setCertificate('');
     setCertificateKey('');
@@ -106,7 +106,6 @@ export default function ProxyModal({
   const normalizedDomain = domain.trim().toLowerCase().replace(/\.$/, '');
   const normalizedName = name.trim().toLowerCase();
   const managedDomain = options.managedDomains.find((entry) => entry.uuid === managedDomainUuid) ?? null;
-  const targets = options.proxyTargets.join(', ');
 
   // editing an existing custom-cert proxy may keep its certificate
   const keepsCertificate = proxy?.certificateMode === 'custom' && certificateMode === 'custom';
@@ -184,7 +183,7 @@ export default function ProxyModal({
       }}
     >
       <Stack gap='md'>
-        {!proxy && options.allowCustomDomains && canManaged && (
+        {!proxy && canManaged && (
           <SegmentedControl
             fullWidth
             data={[
@@ -201,9 +200,9 @@ export default function ProxyModal({
             withAsterisk
             label={tExt('pages.server.modal.domain', {})}
             description={
-              targets
-                ? tExt('pages.server.modal.domainDescription', { targets })
-                : tExt('pages.server.modal.domainDescriptionNoTargets', {})
+              options.dnsTarget
+                ? tExt('pages.server.modal.domainDescription', { target: options.dnsTarget })
+                : tExt('pages.server.modal.domainDescriptionNoTarget', {})
             }
             placeholder='play.example.com'
             value={domain}

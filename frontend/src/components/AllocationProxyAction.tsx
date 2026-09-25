@@ -29,7 +29,6 @@ export default function AllocationProxyAction({
   });
 
   const label = tExt('pages.server.button.create', {});
-  const noDomainSource = !!data && !data.options.allowCustomDomains && data.options.managedDomains.length === 0;
 
   const item: ContextMenuItem = {
     type: 'action',
@@ -38,7 +37,7 @@ export default function AllocationProxyAction({
     onClick: () => setOpened(true),
     color: 'gray',
     canAccess: canCreate,
-    disabled: !data?.configured || data.proxies.length >= data.limit || noDomainSource,
+    disabled: !data?.configured || data.proxies.length >= data.limit,
   };
   const existing = items.find((entry) => entry.type === 'action' && entry.label === label);
 

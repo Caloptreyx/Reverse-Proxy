@@ -18,22 +18,22 @@ Manager 2.15 (2.10+ supported)
 
 ## What you get
 
-- Per-server proxy limit (`feature_limits.proxies`), domain allowlist and blocked patterns
+- Per-server proxy limit (`feature_limits.proxies`), allowed domain suffixes and blocked patterns
 - Granular permissions and full activity logging
 - Fleet view of every proxy across every server, with a failing count
 - Reconcile tool to spot and fix drift between the panel and the proxy
 - Per-node forward host overrides for NAT'd nodes
 - Let's Encrypt rate-limit protection: DNS is checked before a certificate is requested, attempts
-  are capped per hour and per domain, failures back off, and existing certificates (including
-  wildcards) are reused - so bad DNS can't burn your quota
+  are capped (10 per hour, 3 per domain per week), failures back off, and existing certificates
+  (including wildcards) can be reused - so bad DNS can't burn your quota
 - Never touches proxy hosts or certificates it doesn't own: every host it creates carries an
   ownership marker that is checked before any change
 
 ## Automated
 
 - A background worker issues certificates one at a time and retries with backoff
-- A background sync keeps the proxy in step with the panel, tracks certificate expiry, renews
-  certificates NPM failed to renew and cleans up orphans
+- A background sync keeps the proxy in step with the panel, fixes drift, tracks certificate
+  expiry, renews certificates NPM failed to renew and cleans up orphans it owns
 - Deleted servers take their proxies with them; removed ports disable the proxy until a new port
   is chosen; transfers update the forward target
 - Remote deletions that fail are queued and retried
@@ -41,9 +41,9 @@ Manager 2.15 (2.10+ supported)
 ## Subdomain Manager integration
 
 With the [Subdomain Manager](https://github.com/Caloptreyx/Subdomain-Manager) extension
-installed, users can create proxies directly on your managed domains. DNS records are created
-automatically, Cloudflare zones use DNS-01 validation with the zone's API token, and reserved
-names and existing subdomains are respected.
+installed and enabled, users can create proxies directly on your managed domains. DNS records are
+created automatically, Cloudflare zones use DNS-01 validation with the zone's API token, and
+reserved names and existing subdomains are respected.
 
 ## Installation
 
@@ -62,16 +62,16 @@ under **Admin → Extensions** or drop it into your heavy image's `build/extensi
    keep two-factor authentication off for it.
 2. Enter the NPM URL as reachable **from the panel** (e.g. `http://npm:81` or a VPN address), the
    user's email and password, and press **Test Connection**.
-3. Set the **proxy targets**: the public IP(s) or hostname of the NPM server. Users are told to
-   point their domains here, and certificates are only requested once a domain resolves to one of
-   them.
+3. Set the **DNS target**: the public IP or hostname of the NPM server. Users are told to point
+   their domains here, and HTTP-validated certificates are only requested once a domain resolves
+   to it.
 4. Give servers a proxy limit (default for new servers in the settings, or per server under
    feature limits).
 
 Tabs:
 
-- **Settings** - connection, domain rules, certificate options and rate limits, defaults, the
-  Subdomain Manager integration and the background sync
+- **Settings** - connection, certificates, domain rules, user permissions, defaults for new
+  proxies and the background sync
 - **Nodes** - forward host overrides for nodes behind NAT or on a private network
 - **Proxies** - every proxy on the panel, with status filter, retry and delete
 - **Reconcile** - compare the panel with NPM and fix drift, plus the queue of pending remote
@@ -79,19 +79,9 @@ Tabs:
 
 Permissions: server `proxies.read|create|update|delete`, admin `proxies.read|manage`.
 
-### Screenshots
+### Screenshot
 
-Connection and public proxy address:
-
-![Settings: Nginx Proxy Manager connection and public proxy address](docs/screenshots/settings-connection.png)
-
-Domain rules, limits and defaults for new proxies:
-
-![Settings: domains and limits, defaults for new proxies](docs/screenshots/settings-domains-defaults.png)
-
-Let's Encrypt protection, Subdomain Manager integration and background sync:
-
-![Settings: Let's Encrypt protection, Subdomain Manager and background sync](docs/screenshots/settings-certificates-sync.png)
+![Settings](docs/screenshots/settings.png)
 
 ## API
 

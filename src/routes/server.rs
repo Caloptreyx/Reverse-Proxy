@@ -42,11 +42,11 @@ mod list {
 
     #[derive(ToSchema, Serialize)]
     struct Options {
-        allow_custom_domains: bool,
         allow_letsencrypt: bool,
         allow_custom_certificates: bool,
         allow_custom_nginx: bool,
-        proxy_targets: Vec<String>,
+        /// Where users point their DNS; empty when unset.
+        dns_target: String,
         defaults: ProxyDefaults,
         managed_domains: Vec<ManagedDomain>,
     }
@@ -73,21 +73,19 @@ mod list {
         let ctx = Ctx::load(&state).await?;
         let settings = &ctx.settings;
 
-        let managed_domains =
-            if crate::sm::is_active(&state, settings.subdomain_manager_integration).await {
-                crate::sm::enabled_domains(&state.database)
-                    .await?
-                    .into_iter()
-                    .map(|domain| ManagedDomain {
-                        dns_challenge: settings.managed_dns_challenge
-                            && domain.provider == "cloudflare",
-                        uuid: domain.uuid,
-                        domain: domain.domain,
-                    })
-                    .collect()
-            } else {
-                Vec::new()
-            };
+        let managed_domains = if crate::sm::is_active(&state).await {
+            crate::sm::enabled_domains(&state.database)
+                .await?
+                .into_iter()
+                .map(|domain| ManagedDomain {
+                    dns_challenge: domain.provider == "cloudflare",
+                    uuid: domain.uuid,
+                    domain: domain.domain,
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
 
         ApiResponse::new_serialized(Response {
             proxies: JoinedProxy::all_by_server_uuid(&state.database, server.uuid)
@@ -98,11 +96,10 @@ mod list {
             limit: model::reverse_proxy_limit(&server)?,
             configured: ctx.is_configured(),
             options: Options {
-                allow_custom_domains: settings.allow_custom_domains,
                 allow_letsencrypt: settings.allow_letsencrypt,
                 allow_custom_certificates: settings.allow_custom_certificates,
                 allow_custom_nginx: settings.allow_custom_nginx,
-                proxy_targets: settings.proxy_targets.clone(),
+                dns_target: settings.dns_target().unwrap_or_default().to_string(),
                 defaults: settings.defaults.clone(),
                 managed_domains,
             },

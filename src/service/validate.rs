@@ -23,15 +23,12 @@ pub async fn resolve_domain(
     request: DomainRequest<'_>,
 ) -> Result<ResolvedDomain, anyhow::Error> {
     let settings = &ctx.settings;
-    let integration = sm::is_active(&ctx.state, settings.subdomain_manager_integration).await;
+    let integration = sm::is_active(&ctx.state).await;
 
     let resolved = match request {
         DomainRequest::Custom { domain } => {
-            if !settings.allow_custom_domains {
-                return Err(invalid("custom domains are disabled"));
-            }
             let fqdn = domain::validate_domain(domain).map_err(invalid)?;
-            domain::domain_allowed(&fqdn, &settings.allowed_domains, &settings.blocked())
+            domain::domain_allowed(&fqdn, &settings.allowed_suffixes, &settings.blocked())
                 .map_err(invalid)?;
 
             if integration && sm::domain_shadowed(ctx.db(), &fqdn).await? {
@@ -98,8 +95,8 @@ async fn panel_host(ctx: &Ctx) -> Option<String> {
         .map(str::to_lowercase)
 }
 
-pub fn scheme(value: Option<&str>, defaults: &ProxyDefaults) -> Result<String, anyhow::Error> {
-    let scheme = value.unwrap_or(&defaults.forward_scheme).to_lowercase();
+pub fn scheme(value: Option<&str>) -> Result<String, anyhow::Error> {
+    let scheme = value.unwrap_or("http").to_lowercase();
     match scheme.as_str() {
         "http" | "https" => Ok(scheme),
         _ => Err(invalid("the forward scheme must be `http` or `https`")),
@@ -163,11 +160,11 @@ impl From<&ProxyDefaults> for ProxyFlags {
     fn from(defaults: &ProxyDefaults) -> Self {
         Self {
             websockets: defaults.websockets,
-            caching: defaults.caching,
+            caching: false,
             http2: defaults.http2,
-            hsts: defaults.hsts,
-            hsts_subdomains: defaults.hsts_subdomains,
-            force_https: defaults.force_https,
+            hsts: false,
+            hsts_subdomains: false,
+            force_https: true,
             block_exploits: defaults.block_exploits,
         }
     }

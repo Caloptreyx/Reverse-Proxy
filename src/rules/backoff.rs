@@ -28,6 +28,11 @@ pub fn preflight_retry_interval(created: DateTime<Utc>, now: DateTime<Utc>) -> D
     }
 }
 
+/// Let's Encrypt protection: issuance attempts allowed per hour across the
+/// panel, and per domain per week.
+pub const MAX_ISSUANCES_PER_HOUR: u32 = 10;
+pub const MAX_ISSUANCES_PER_DOMAIN_PER_WEEK: u32 = 3;
+
 /// Given issuance-ledger timestamps, computes the earliest moment a new
 /// issuance is allowed. `None` when it may proceed immediately. Both windows
 /// must have room; the returned instant is the later of the two unblock

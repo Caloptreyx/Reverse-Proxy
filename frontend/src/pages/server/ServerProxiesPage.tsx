@@ -36,8 +36,7 @@ export default function ServerProxiesPage() {
 
   const count = data?.proxies.length ?? 0;
   const limit = data?.limit ?? 0;
-  const noDomainSource = !!data && !data.options.allowCustomDomains && data.options.managedDomains.length === 0;
-  const createDisabled = !data?.configured || count >= limit || noDomainSource;
+  const createDisabled = !data?.configured || count >= limit;
 
   return (
     <ServerContentContainer
@@ -67,8 +66,8 @@ export default function ServerProxiesPage() {
     >
       <Stack gap='md'>
         {data && !data.configured && <Alert color='yellow'>{tExt('pages.server.notConfigured', {})}</Alert>}
-        {data?.configured && data.options.allowCustomDomains && data.options.proxyTargets.length > 0 && (
-          <Alert color='blue'>{tExt('pages.server.dnsHint', { targets: data.options.proxyTargets.join(', ') })}</Alert>
+        {data?.configured && data.options.dnsTarget && (
+          <Alert color='blue'>{tExt('pages.server.dnsHint', { target: data.options.dnsTarget })}</Alert>
         )}
 
         {data && (

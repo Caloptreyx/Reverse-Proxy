@@ -23,10 +23,21 @@ export const proxyFlagsSchema = z.object({
 export type ProxyFlags = z.infer<typeof proxyFlagsSchema>;
 export const PROXY_FLAGS = Object.keys(proxyFlagsSchema.shape) as (keyof ProxyFlags)[];
 
-export const proxyDefaultsSchema = proxyFlagsSchema.extend({
-  forwardScheme: z.enum(['http', 'https']),
+export const proxyDefaultsSchema = z.object({
+  websockets: z.boolean(),
+  blockExploits: z.boolean(),
+  http2: z.boolean(),
 });
 export type ProxyDefaults = z.infer<typeof proxyDefaultsSchema>;
+
+/** Flags a new proxy starts with: the admin defaults, everything else off except force HTTPS. */
+export const initialFlags = (defaults: ProxyDefaults): ProxyFlags => ({
+  caching: false,
+  hsts: false,
+  hstsSubdomains: false,
+  forceHttps: true,
+  ...defaults,
+});
 
 export const proxySchema = proxyFlagsSchema.extend({
   uuid: z.string(),
@@ -70,11 +81,10 @@ export const serverProxiesSchema = z.object({
   limit: z.number().int(),
   configured: z.boolean(),
   options: z.object({
-    allowCustomDomains: z.boolean(),
     allowLetsencrypt: z.boolean(),
     allowCustomCertificates: z.boolean(),
     allowCustomNginx: z.boolean(),
-    proxyTargets: z.array(z.string()),
+    dnsTarget: z.string(),
     defaults: proxyDefaultsSchema,
     managedDomains: z.array(managedDomainSchema),
   }),
@@ -111,26 +121,19 @@ export const extensionSettingsSchema = z.object({
   npmIdentity: z.string(),
   npmSecret: z.string().optional(),
   requestTimeoutSeconds: z.number().int().min(5).max(300),
-  proxyTargets: z.array(z.string()),
-  dnsPreflight: z.boolean(),
+  dnsTarget: z.string(),
   defaultLimit: z.number().int().min(0),
-  allowCustomDomains: z.boolean(),
   allowLetsencrypt: z.boolean(),
   allowCustomCertificates: z.boolean(),
   allowCustomNginx: z.boolean(),
-  allowedDomains: z.array(z.string()),
+  allowedSuffixes: z.array(z.string()),
   blockedPatterns: z.array(z.string()),
   defaults: proxyDefaultsSchema,
   nodeForwardHosts: z.record(z.string(), z.string()),
-  maxIssuancesPerHour: z.number().int().min(1),
-  maxIssuancesPerDomainPerWeek: z.number().int().min(1),
   reuseCertificates: z.boolean(),
   certificateWarningDays: z.number().int().min(1).max(60),
-  subdomainManagerIntegration: z.boolean(),
-  managedDnsChallenge: z.boolean(),
   dnsPropagationSeconds: z.number().int().min(0).max(600),
   syncEnabled: z.boolean(),
-  autoReconcile: z.boolean(),
   syncIntervalSeconds: z.number().int().min(30).max(86400),
 });
 export type ExtensionSettings = z.infer<typeof extensionSettingsSchema>;

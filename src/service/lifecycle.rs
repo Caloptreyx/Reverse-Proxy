@@ -59,7 +59,7 @@ pub async fn create(
     verify_allocation(ctx, server, input.allocation_uuid).await?;
 
     let resolved = validate::resolve_domain(ctx, input.domain).await?;
-    let forward_scheme = validate::scheme(input.forward_scheme, &ctx.settings.defaults)?;
+    let forward_scheme = validate::scheme(input.forward_scheme)?;
     let certificate_mode = validate::certificate_mode(ctx, input.certificate_mode)?;
     if certificate_mode == CertificateMode::Custom && input.custom_certificate.is_none() {
         return Err(invalid("upload a certificate and its private key"));
@@ -147,7 +147,7 @@ pub async fn update(
         proxy.allocation_uuid = Some(allocation_uuid);
     }
     if input.forward_scheme.is_some() {
-        proxy.forward_scheme = validate::scheme(input.forward_scheme, &ctx.settings.defaults)?;
+        proxy.forward_scheme = validate::scheme(input.forward_scheme)?;
     }
     proxy.flags = input.flags.apply(proxy.flags);
     if let Some(config) = validate::advanced_config(ctx, input.advanced_config)? {

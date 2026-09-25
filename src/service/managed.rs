@@ -5,74 +5,48 @@ use crate::{
     rules::forward::target_as_ip,
     sm::SmDomain,
 };
-use std::net::IpAddr;
 
-/// The records pointing `fqdn` at the proxy targets: A/AAAA per address, or
-/// one CNAME for a hostname target.
-pub fn planned_records(fqdn: &str, targets: &[String]) -> Vec<DnsRecordInput> {
-    let (addresses, hostnames): (Vec<_>, Vec<_>) =
-        targets.iter().partition(|target| target_as_ip(target).is_some());
-
-    if addresses.is_empty() {
-        return hostnames
-            .first()
-            .map(|hostname| DnsRecordInput {
-                record_type: DnsRecordType::CNAME,
-                name: fqdn.to_string(),
-                content: hostname.trim().trim_end_matches('.').to_string(),
-            })
-            .into_iter()
-            .collect();
-    }
-
-    addresses
-        .iter()
-        .filter_map(|target| target_as_ip(target))
-        .map(|ip| DnsRecordInput {
-            record_type: match ip {
-                IpAddr::V4(_) => DnsRecordType::A,
-                IpAddr::V6(_) => DnsRecordType::AAAA,
+/// The records pointing `fqdn` at the DNS target: an A/AAAA record for an
+/// address, a CNAME for a hostname.
+pub fn planned_record(fqdn: &str, target: &str) -> DnsRecordInput {
+    match target_as_ip(target) {
+        Some(ip) => DnsRecordInput {
+            record_type: if ip.is_ipv4() {
+                DnsRecordType::A
+            } else {
+                DnsRecordType::AAAA
             },
             name: fqdn.to_string(),
             content: ip.to_string(),
-        })
-        .collect()
+        },
+        None => DnsRecordInput {
+            record_type: DnsRecordType::CNAME,
+            name: fqdn.to_string(),
+            content: target.to_string(),
+        },
+    }
 }
 
-/// Creates the records at the managed domain's provider. On a partial
-/// failure the records created so far are removed again.
+/// Creates the record at the managed domain's provider.
 pub async fn create_records(
     ctx: &Ctx,
     domain: &SmDomain,
     fqdn: &str,
 ) -> Result<Vec<StoredRecord>, anyhow::Error> {
-    let planned = planned_records(fqdn, &ctx.settings.proxy_targets);
-    if planned.is_empty() {
+    let Some(target) = ctx.settings.dns_target() else {
         return Err(invalid(
-            "managed subdomains are unavailable: the administrator has not configured the proxy's public address",
+            "managed subdomains are unavailable: the administrator has not configured the DNS target",
         ));
-    }
+    };
 
     let provider = domain.provider_client(ctx.db()).await?;
-    let mut created = Vec::new();
-    for record in &planned {
-        match provider.create_record(record).await {
-            Ok(stored) => created.push(stored),
-            Err(err) => {
-                for stored in &created {
-                    if let Err(cleanup) = provider.delete_record(&stored.id).await {
-                        tracing::warn!(record = %stored.id, "failed to roll back dns record: {cleanup:?}");
-                    }
-                }
-                return Err(super::user_error(
-                    format!("failed to create the dns records: {err}"),
-                    axum::http::StatusCode::BAD_GATEWAY,
-                ));
-            }
-        }
+    match provider.create_record(&planned_record(fqdn, target)).await {
+        Ok(stored) => Ok(vec![stored]),
+        Err(err) => Err(super::user_error(
+            format!("failed to create the dns record: {err}"),
+            axum::http::StatusCode::BAD_GATEWAY,
+        )),
     }
-
-    Ok(created)
 }
 
 #[cfg(test)]
@@ -81,26 +55,19 @@ mod tests {
 
     #[test]
     fn addresses_become_a_and_aaaa() {
-        let records = planned_records(
-            "a.example.com",
-            &["203.0.113.1".into(), "2001:db8::1".into(), "proxy.example.com".into()],
+        assert_eq!(
+            planned_record("a.example.com", "203.0.113.1").record_type,
+            DnsRecordType::A
         );
-        assert_eq!(records.len(), 2);
-        assert_eq!(records[0].record_type, DnsRecordType::A);
-        assert_eq!(records[1].record_type, DnsRecordType::AAAA);
-        assert!(records.iter().all(|r| r.name == "a.example.com"));
+        let record = planned_record("a.example.com", "2001:db8::1");
+        assert_eq!(record.record_type, DnsRecordType::AAAA);
+        assert_eq!(record.name, "a.example.com");
     }
 
     #[test]
-    fn hostname_becomes_one_cname() {
-        let records = planned_records("a.example.com", &["proxy.example.com.".into()]);
-        assert_eq!(records.len(), 1);
-        assert_eq!(records[0].record_type, DnsRecordType::CNAME);
-        assert_eq!(records[0].content, "proxy.example.com");
-    }
-
-    #[test]
-    fn no_targets_no_records() {
-        assert!(planned_records("a.example.com", &[]).is_empty());
+    fn hostname_becomes_cname() {
+        let record = planned_record("a.example.com", "proxy.example.com");
+        assert_eq!(record.record_type, DnsRecordType::CNAME);
+        assert_eq!(record.content, "proxy.example.com");
     }
 }

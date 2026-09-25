@@ -94,14 +94,12 @@ async fn reusable(
         .max_by_key(|certificate| certificate.expires_at()))
 }
 
-/// DNS-01 via Cloudflare for managed domains when enabled.
+/// DNS-01 via Cloudflare for Subdomain Manager domains hosted there.
 async fn dns_challenge(ctx: &Ctx, proxy: &Proxy) -> Result<Option<DnsChallenge>, anyhow::Error> {
     let Some(domain_uuid) = proxy.managed_domain_uuid else {
         return Ok(None);
     };
-    if !ctx.settings.managed_dns_challenge
-        || !crate::sm::is_active(&ctx.state, ctx.settings.subdomain_manager_integration).await
-    {
+    if !crate::sm::is_active(&ctx.state).await {
         return Ok(None);
     }
 
@@ -126,15 +124,12 @@ async fn lookup(host: &str) -> Vec<IpAddr> {
     }
 }
 
-/// HTTP-01 preflight: the domain must resolve to one of the proxy targets.
-async fn preflight(domain: &str, targets: &[String]) -> forward::PreflightCheck {
-    let mut target_ips = Vec::new();
-    for target in targets {
-        match forward::target_as_ip(target) {
-            Some(ip) => target_ips.push(ip),
-            None => target_ips.extend(lookup(target).await),
-        }
-    }
+/// HTTP-01 preflight: the domain must resolve to the DNS target.
+async fn preflight(domain: &str, target: &str) -> forward::PreflightCheck {
+    let target_ips = match forward::target_as_ip(target) {
+        Some(ip) => vec![ip],
+        None => lookup(target).await,
+    };
     forward::compare_preflight(domain, &lookup(domain).await, &target_ips)
 }
 
@@ -158,8 +153,8 @@ pub async fn issue(ctx: &Ctx, client: &NpmClient, proxy: &mut Proxy) -> Result<(
         now,
         &hour,
         &week,
-        ctx.settings.max_issuances_per_hour,
-        ctx.settings.max_issuances_per_domain_per_week,
+        backoff::MAX_ISSUANCES_PER_HOUR,
+        backoff::MAX_ISSUANCES_PER_DOMAIN_PER_WEEK,
     ) {
         proxy.set_status(
             ProxyStatus::Issuing,
@@ -174,10 +169,8 @@ pub async fn issue(ctx: &Ctx, client: &NpmClient, proxy: &mut Proxy) -> Result<(
 
     let dns = dns_challenge(ctx, proxy).await?;
     if dns.is_none()
-        && ctx.settings.dns_preflight
-        && !ctx.settings.proxy_targets.is_empty()
-        && let forward::PreflightCheck::Fail(reason) =
-            preflight(&proxy.domain, &ctx.settings.proxy_targets).await
+        && let Some(target) = ctx.settings.dns_target()
+        && let forward::PreflightCheck::Fail(reason) = preflight(&proxy.domain, target).await
     {
         proxy.set_status(ProxyStatus::PendingDns, Some(reason));
         proxy.next_attempt = Some(now + backoff::preflight_retry_interval(proxy.created, now));
@@ -301,8 +294,8 @@ async fn renew(ctx: &Ctx, client: &NpmClient, proxy: &mut Proxy, id: i64) -> boo
         Utc::now(),
         &hour,
         &week,
-        ctx.settings.max_issuances_per_hour,
-        ctx.settings.max_issuances_per_domain_per_week,
+        backoff::MAX_ISSUANCES_PER_HOUR,
+        backoff::MAX_ISSUANCES_PER_DOMAIN_PER_WEEK,
     )
     .is_some()
     {

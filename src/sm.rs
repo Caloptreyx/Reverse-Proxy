@@ -36,13 +36,9 @@ impl SmDomain {
     }
 }
 
-/// Whether the integration is usable: the setting is on, SM is loaded and not
-/// disabled, and its table exists (e.g. SM uninstalled but proxies remain).
-pub async fn is_active(state: &State, setting_enabled: bool) -> bool {
-    if !setting_enabled {
-        return false;
-    }
-
+/// Whether the integration is usable: SM is loaded and not disabled, and its
+/// table exists (e.g. SM uninstalled but proxies remain).
+pub async fn is_active(state: &State) -> bool {
     let loaded = {
         let extensions = state.extensions.extensions().await;
         extensions

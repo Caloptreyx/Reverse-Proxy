@@ -45,8 +45,8 @@ pub fn node_public_host(node: &shared::models::node::Node) -> Option<String> {
         .map(str::to_string)
 }
 
-/// Extracts the host part from a `proxy_targets` entry, which may be a bare
-/// IP or a hostname. Returns `Some(IpAddr)` for literal IPs.
+/// Parses the DNS target, which may be a bare IP or a hostname. Returns
+/// `Some(IpAddr)` for literal IPs.
 pub fn target_as_ip(target: &str) -> Option<IpAddr> {
     let target = target.trim().trim_end_matches('.');
     // tolerate optional brackets around IPv6 literals
@@ -57,8 +57,8 @@ pub fn target_as_ip(target: &str) -> Option<IpAddr> {
         .ok()
 }
 
-/// Outcome of comparing the domain's resolved addresses against the
-/// configured proxy targets.
+/// Outcome of comparing the domain's resolved addresses against the DNS
+/// target.
 pub enum PreflightCheck {
     Pass,
     /// Readable message explaining what to fix.
@@ -66,8 +66,8 @@ pub enum PreflightCheck {
 }
 
 /// DNS preflight for HTTP-01: `resolved` are the IPs the domain currently
-/// resolves to, `targets` the public IPs the NPM box listens on. Passes when
-/// any resolved IP is a target.
+/// resolves to, `targets` the IPs of the DNS target. Passes when any
+/// resolved IP is a target.
 pub fn compare_preflight(domain: &str, resolved: &[IpAddr], targets: &[IpAddr]) -> PreflightCheck {
     if resolved.is_empty() {
         return PreflightCheck::Fail(format!("{domain} does not resolve yet"));
@@ -194,7 +194,7 @@ mod tests {
             compare_preflight("play.example.com", &[other, target], &[target]),
             PreflightCheck::Pass
         ));
-        // no targets configured = preflight disabled by the caller anyway
+        // a target hostname that doesn't resolve can't be checked
         assert!(matches!(
             compare_preflight("play.example.com", &[other], &[]),
             PreflightCheck::Pass
