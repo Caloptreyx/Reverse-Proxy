@@ -2,7 +2,7 @@
 name = "dev_caloptreyx_reverseproxy"
 description = "Put a domain in front of a server allocation via Nginx Proxy Manager with automatic Let's Encrypt certificates."
 authors = ["Caloptreyx"]
-version = "0.1.0"
+version = "0.1.1"
 edition = { workspace = true }
 
 [dependencies]
