@@ -79,6 +79,20 @@ Tabs:
 
 Permissions: server `proxies.read|create|update|delete`, admin `proxies.read|manage`.
 
+### Screenshots
+
+Connection and public proxy address:
+
+![Settings: Nginx Proxy Manager connection and public proxy address](docs/screenshots/settings-connection.png)
+
+Domain rules, limits and defaults for new proxies:
+
+![Settings: domains and limits, defaults for new proxies](docs/screenshots/settings-domains-defaults.png)
+
+Let's Encrypt protection, Subdomain Manager integration and background sync:
+
+![Settings: Let's Encrypt protection, Subdomain Manager and background sync](docs/screenshots/settings-certificates-sync.png)
+
 ## API
 
 - `GET|POST /api/client/servers/{server}/reverse-proxies`,
