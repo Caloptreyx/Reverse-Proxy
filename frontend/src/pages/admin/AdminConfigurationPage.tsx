@@ -1,3 +1,6 @@
+import { faDiscord } from '@fortawesome/free-brands-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { Button } from '@mantine/core';
 import Tabs from '@/elements/layout/Tabs.tsx';
 import { useExtTranslations } from '../../translations.ts';
 import NodesTab from './NodesTab.tsx';
@@ -15,6 +18,19 @@ export default function AdminConfigurationPage() {
         <Tabs.Tab value='nodes'>{tExt('pages.admin.tabs.nodes', {})}</Tabs.Tab>
         <Tabs.Tab value='proxies'>{tExt('pages.admin.tabs.proxies', {})}</Tabs.Tab>
         <Tabs.Tab value='reconcile'>{tExt('pages.admin.tabs.reconcile', {})}</Tabs.Tab>
+        <Button
+          component='a'
+          href='https://discord.gg/4qjMWU7S8x'
+          target='_blank'
+          rel='noopener noreferrer'
+          variant='subtle'
+          size='compact-sm'
+          ml='auto'
+          style={{ alignSelf: 'center' }}
+          leftSection={<FontAwesomeIcon icon={faDiscord} />}
+        >
+          {tExt('pages.admin.support', {})}
+        </Button>
       </Tabs.List>
 
       <Tabs.Panel value='settings' pt='md'>

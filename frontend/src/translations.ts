@@ -110,6 +110,7 @@ const translations = defineTranslations({
           proxies: 'Proxies',
           reconcile: 'Reconcile',
         },
+        support: 'Support & feature requests',
         connection: {
           title: 'Connection',
           url: 'Instance URL',
