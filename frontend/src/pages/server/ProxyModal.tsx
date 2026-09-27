@@ -31,7 +31,7 @@ import { useExtTranslations } from '../../translations.ts';
 
 type Kind = 'custom' | 'managed';
 type Scheme = 'http' | 'https';
-type CertificateMode = 'letsencrypt' | 'custom';
+type CertificateMode = 'letsencrypt' | 'custom' | 'http';
 
 const pickFlags = (source: ProxyFlags): ProxyFlags => ({
   websockets: source.websockets,
@@ -62,8 +62,11 @@ export default function ProxyModal({
   const { addToast } = useToast();
 
   const canManaged = options.managedDomains.length > 0;
-  const defaultMode: CertificateMode =
-    options.allowLetsencrypt || !options.allowCustomCertificates ? 'letsencrypt' : 'custom';
+  const defaultMode: CertificateMode = options.allowLetsencrypt
+    ? 'letsencrypt'
+    : options.allowCustomCertificates
+      ? 'custom'
+      : 'http';
   const certificateModes = [
     ...(options.allowLetsencrypt || proxy?.certificateMode === 'letsencrypt'
       ? [{ value: 'letsencrypt', label: tExt('pages.server.modal.certificateLetsEncrypt', {}) }]
@@ -71,6 +74,7 @@ export default function ProxyModal({
     ...(options.allowCustomCertificates || proxy?.certificateMode === 'custom'
       ? [{ value: 'custom', label: tExt('pages.server.modal.certificateCustom', {}) }]
       : []),
+    { value: 'http', label: tExt('pages.server.modal.certificateHttp', {}) },
   ];
 
   const [loading, setLoading] = useState(false);
@@ -110,7 +114,7 @@ export default function ProxyModal({
   // editing an existing custom-cert proxy may keep its certificate
   const keepsCertificate = proxy?.certificateMode === 'custom' && certificateMode === 'custom';
   const certificateValid =
-    certificateMode === 'letsencrypt' ||
+    certificateMode !== 'custom' ||
     (certificate.trim() && certificateKey.trim()) ||
     (keepsCertificate && !certificate.trim() && !certificateKey.trim());
 
@@ -262,60 +266,56 @@ export default function ProxyModal({
           allowDeselect={false}
         />
 
-        {certificateModes.length > 0 && (
+        <Select
+          label={tExt('pages.server.modal.certificateMode', {})}
+          data={certificateModes}
+          value={certificateMode}
+          onChange={(value) => value && setCertificateMode(value as CertificateMode)}
+          allowDeselect={false}
+        />
+        {certificateMode === 'custom' && (
           <>
-            <Select
-              label={tExt('pages.server.modal.certificateMode', {})}
-              data={certificateModes}
-              value={certificateMode}
-              onChange={(value) => value && setCertificateMode(value as CertificateMode)}
-              allowDeselect={false}
-            />
-            {certificateMode === 'custom' && (
-              <>
-                {keepsCertificate && (
-                  <Text size='sm' c='dimmed'>
-                    {tExt('pages.server.modal.replaceCertificate', {})}
-                  </Text>
-                )}
-                <TextArea
-                  withAsterisk={!keepsCertificate}
-                  label={tExt('pages.server.modal.certificate', {})}
-                  placeholder='-----BEGIN CERTIFICATE-----'
-                  value={certificate}
-                  onChange={(e) => setCertificate(e.target.value)}
-                  autosize
-                  minRows={3}
-                  maxRows={8}
-                  ff='monospace'
-                />
-                <TextArea
-                  withAsterisk={!keepsCertificate}
-                  label={tExt('pages.server.modal.certificateKey', {})}
-                  placeholder='-----BEGIN PRIVATE KEY-----'
-                  value={certificateKey}
-                  onChange={(e) => setCertificateKey(e.target.value)}
-                  autosize
-                  minRows={3}
-                  maxRows={8}
-                  ff='monospace'
-                />
-                <TextArea
-                  label={tExt('pages.server.modal.intermediate', {})}
-                  value={intermediate}
-                  onChange={(e) => setIntermediate(e.target.value)}
-                  autosize
-                  minRows={2}
-                  maxRows={8}
-                  ff='monospace'
-                />
-              </>
+            {keepsCertificate && (
+              <Text size='sm' c='dimmed'>
+                {tExt('pages.server.modal.replaceCertificate', {})}
+              </Text>
             )}
+            <TextArea
+              withAsterisk={!keepsCertificate}
+              label={tExt('pages.server.modal.certificate', {})}
+              placeholder='-----BEGIN CERTIFICATE-----'
+              value={certificate}
+              onChange={(e) => setCertificate(e.target.value)}
+              autosize
+              minRows={3}
+              maxRows={8}
+              ff='monospace'
+            />
+            <TextArea
+              withAsterisk={!keepsCertificate}
+              label={tExt('pages.server.modal.certificateKey', {})}
+              placeholder='-----BEGIN PRIVATE KEY-----'
+              value={certificateKey}
+              onChange={(e) => setCertificateKey(e.target.value)}
+              autosize
+              minRows={3}
+              maxRows={8}
+              ff='monospace'
+            />
+            <TextArea
+              label={tExt('pages.server.modal.intermediate', {})}
+              value={intermediate}
+              onChange={(e) => setIntermediate(e.target.value)}
+              autosize
+              minRows={2}
+              maxRows={8}
+              ff='monospace'
+            />
           </>
         )}
 
         <Divider label={tExt('pages.server.modal.options', {})} labelPosition='left' />
-        <FlagSwitches value={flags} onChange={setFlags} />
+        <FlagSwitches value={flags} onChange={setFlags} tls={certificateMode !== 'http'} />
 
         {options.allowCustomNginx && (
           <TextArea

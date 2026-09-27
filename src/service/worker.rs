@@ -74,12 +74,13 @@ async fn step(ctx: &Ctx, client: &NpmClient, proxy: &mut Proxy) -> Result<(), an
             }
             CertificateMode::Letsencrypt => proxy.set_status(
                 ProxyStatus::Failed,
-                Some("Let's Encrypt certificates are disabled - upload your own certificate.".into()),
+                Some("Let's Encrypt certificates are disabled - choose another certificate option.".into()),
             ),
             CertificateMode::Custom => proxy.set_status(
                 ProxyStatus::Failed,
                 Some("The certificate is missing - upload a new one.".into()),
             ),
+            CertificateMode::Http => proxy.set_status(ProxyStatus::Live, None),
         }
     } else {
         proxy.set_status(ProxyStatus::Live, None);

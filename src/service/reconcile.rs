@@ -257,6 +257,7 @@ pub async fn fix(ctx: &Ctx, client: &NpmClient, id: &str) -> Result<(), anyhow::
                     ProxyStatus::Failed,
                     Some("The certificate was removed from the proxy manager - upload a new one.".into()),
                 ),
+                CertificateMode::Http => proxy.set_status(ProxyStatus::Live, None),
             }
             hosts::push(ctx, client, &mut proxy).await?;
             proxy.save_state(ctx.db()).await?;

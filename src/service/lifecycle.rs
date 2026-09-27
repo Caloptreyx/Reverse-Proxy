@@ -100,8 +100,14 @@ pub async fn create(
                 hosts::push(ctx, &client, &mut proxy).await.map_err(upstream)?;
             }
             _ => {
+                let pending = if certificate_mode == CertificateMode::Http {
+                    ProxyStatus::Live
+                } else {
+                    ProxyStatus::Issuing
+                };
                 match hosts::push(ctx, &client, &mut proxy).await {
-                    Ok(_) => proxy.schedule_now(ProxyStatus::Issuing, None),
+                    Ok(_) if pending == ProxyStatus::Live => proxy.set_status(pending, None),
+                    Ok(_) => proxy.schedule_now(pending, None),
                     Err(err) if is_rejection(&err) => return Err(upstream(err)),
                     // the proxy manager is unreachable - the worker retries
                     Err(err) => proxy.schedule_now(
@@ -186,13 +192,25 @@ pub async fn update(
             proxy.issue_attempts = 0;
             switched_to_letsencrypt = true;
         }
+        (CertificateMode::Http, _) if proxy.certificate_mode != CertificateMode::Http => {
+            replaced = certificates::previously_owned(&proxy);
+            proxy.detach_certificate();
+            proxy.certificate_mode = CertificateMode::Http;
+            proxy.issue_attempts = 0;
+            proxy.next_attempt = None;
+            if !lost_port {
+                proxy.set_status(ProxyStatus::Live, None);
+            }
+        }
         _ => {}
     }
 
     // a proxy that got its port back is live again when it has a
-    // certificate, otherwise it goes back to the worker - as does one that
-    // just switched to Let's Encrypt. Plain edits keep the retry schedule.
-    if lost_port && proxy.certificate_id().is_some() {
+    // certificate or needs none, otherwise it goes back to the worker - as
+    // does one that just switched to Let's Encrypt. Plain edits keep the
+    // retry schedule.
+    let needs_certificate = proxy.certificate_mode != CertificateMode::Http;
+    if lost_port && (proxy.certificate_id().is_some() || !needs_certificate) {
         proxy.set_status(ProxyStatus::Live, None);
     } else if (lost_port || switched_to_letsencrypt) && proxy.certificate_id().is_none() {
         proxy.schedule_now(ProxyStatus::Issuing, None);

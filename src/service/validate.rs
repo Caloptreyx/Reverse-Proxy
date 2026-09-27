@@ -105,14 +105,16 @@ pub fn scheme(value: Option<&str>) -> Result<String, anyhow::Error> {
 
 pub fn certificate_mode(ctx: &Ctx, value: &str) -> Result<CertificateMode, anyhow::Error> {
     match CertificateMode::parse(value) {
-        Some(CertificateMode::Letsencrypt) if !ctx.settings.allow_letsencrypt => Err(invalid(
-            "let's encrypt certificates are disabled - upload your own certificate",
-        )),
+        Some(CertificateMode::Letsencrypt) if !ctx.settings.allow_letsencrypt => {
+            Err(invalid("let's encrypt certificates are disabled"))
+        }
         Some(CertificateMode::Custom) if !ctx.settings.allow_custom_certificates => {
             Err(invalid("uploading certificates is disabled"))
         }
         Some(mode) => Ok(mode),
-        None => Err(invalid("the certificate mode must be `letsencrypt` or `custom`")),
+        None => Err(invalid(
+            "the certificate mode must be `letsencrypt`, `custom` or `http`",
+        )),
     }
 }
 

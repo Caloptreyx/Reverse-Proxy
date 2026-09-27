@@ -58,6 +58,7 @@ const translations = defineTranslations({
         certificate: {
           letsencrypt: "Let's Encrypt",
           custom: 'Custom',
+          http: 'HTTP only',
           expires: 'expires {date}',
           none: 'none yet',
         },
@@ -89,6 +90,7 @@ const translations = defineTranslations({
           certificateMode: 'Certificate',
           certificateLetsEncrypt: "Let's Encrypt (automatic)",
           certificateCustom: 'Upload my own',
+          certificateHttp: 'HTTP only (no SSL)',
           certificate: 'Certificate (PEM)',
           certificateKey: 'Private key (PEM)',
           intermediate: 'Intermediate certificate (PEM, optional)',

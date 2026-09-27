@@ -54,7 +54,7 @@ export const proxySchema = proxyFlagsSchema.extend({
     .nullable(),
   forwardScheme: z.enum(['http', 'https']),
   advancedConfig: z.string(),
-  certificateMode: z.enum(['letsencrypt', 'custom']),
+  certificateMode: z.enum(['letsencrypt', 'custom', 'http']),
   status: proxyStatusSchema,
   statusMessage: z.string().nullable(),
   certificateExpires: z.coerce.date().nullable(),
@@ -105,14 +105,14 @@ export const createProxySchema = proxyFlagsSchema.extend(certificateInputSchema.
   name: z.string().optional(),
   allocationUuid: z.string(),
   forwardScheme: z.enum(['http', 'https']),
-  certificateMode: z.enum(['letsencrypt', 'custom']),
+  certificateMode: z.enum(['letsencrypt', 'custom', 'http']),
 });
 export type CreateProxy = z.infer<typeof createProxySchema>;
 
 export const updateProxySchema = proxyFlagsSchema.extend(certificateInputSchema.shape).extend({
   allocationUuid: z.string().optional(),
   forwardScheme: z.enum(['http', 'https']),
-  certificateMode: z.enum(['letsencrypt', 'custom']).optional(),
+  certificateMode: z.enum(['letsencrypt', 'custom', 'http']).optional(),
 });
 export type UpdateProxy = z.infer<typeof updateProxySchema>;
 

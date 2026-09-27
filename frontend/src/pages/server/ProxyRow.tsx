@@ -131,11 +131,13 @@ export default function ProxyRow({
 
             <TableData>
               {tExt(`pages.server.certificate.${proxy.certificateMode}`, {})}
-              <Text size='xs' c='dimmed'>
-                {proxy.certificateExpires
-                  ? tExt('pages.server.certificate.expires', { date: proxy.certificateExpires.toLocaleDateString() })
-                  : tExt('pages.server.certificate.none', {})}
-              </Text>
+              {proxy.certificateMode !== 'http' && (
+                <Text size='xs' c='dimmed'>
+                  {proxy.certificateExpires
+                    ? tExt('pages.server.certificate.expires', { date: proxy.certificateExpires.toLocaleDateString() })
+                    : tExt('pages.server.certificate.none', {})}
+                </Text>
+              )}
             </TableData>
 
             <TableData>

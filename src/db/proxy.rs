@@ -17,6 +17,7 @@ text_enum!(ProxyStatus {
 text_enum!(CertificateMode {
     Letsencrypt => "letsencrypt",
     Custom => "custom",
+    Http => "http",
 });
 
 /// User-facing proxy options, stored as individual columns.

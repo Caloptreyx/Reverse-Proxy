@@ -10,7 +10,7 @@ Manager 2.15 (2.10+ supported)
 ## What your users get
 
 - Custom domains or managed subdomains, pointed at any of the server's allocations
-- Automatic HTTPS with Let's Encrypt, or upload their own certificate
+- Automatic HTTPS with Let's Encrypt, their own uploaded certificate, or plain HTTP only
 - WebSockets, caching, HTTP/2, HSTS, force-HTTPS and exploit blocking per proxy
 - Optional custom nginx snippets (admin opt-in)
 - Clear status at a glance - *live*, *issuing*, *waiting for DNS* or *failed* with a readable reason
