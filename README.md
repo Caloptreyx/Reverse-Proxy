@@ -1,11 +1,13 @@
 # Reverse Proxy Manager
 
 A [Calagopus Panel](https://calagopus.com) extension that lets users put a domain in front of one
-of their server's ports through **Nginx Proxy Manager**, with automatic **Let's Encrypt**
-certificates. Users add their own domain (or pick a managed subdomain), choose a port, done.
+of their server's ports through **Nginx Proxy Manager** or **[NPMplus](https://github.com/ZoeyVid/NPMplus)**,
+with automatic **Let's Encrypt** certificates. Users add their own domain (or pick a managed
+subdomain), choose a port, done.
 
 Package name: `dev.caloptreyx.reverseproxy` · Requires panel `>=1.2.2` · Tested with Nginx Proxy
-Manager 2.15 (2.10+ supported)
+Manager 2.15 (2.10+ supported) and NPMplus 2026-07-24-r1 plus its September 2026 development
+builds (the flavor is detected automatically)
 
 ## What your users get
 
@@ -62,6 +64,13 @@ under **Admin → Extensions** or drop it into your heavy image's `build/extensi
    keep two-factor authentication off for it.
 2. Enter the NPM URL as reachable **from the panel** (e.g. `http://npm:81` or a VPN address), the
    user's email and password, and press **Test Connection**.
+
+   **NPMplus:** use an `https://` URL (e.g. `https://npmplus:81`) and turn on **Accept self-signed
+   certificate** unless you gave NPMplus a trusted certificate via `DEFAULT_CERT_ID`. New NPMplus
+   users start with every permission hidden - set proxy hosts and certificates to *manage* (access
+   lists at least *view*). NPMplus registers the Let's Encrypt account with its `ACME_EMAIL`, so
+   the user's email doesn't matter. It always enables WebSockets and HTTP/2 and has no caching or
+   exploit blocking, so those proxy options have no effect there.
 3. Set the **DNS target**: the public IP or hostname of the NPM server. Users are told to point
    their domains here, and HTTP-validated certificates are only requested once a domain resolves
    to it.

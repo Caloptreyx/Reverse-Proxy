@@ -121,6 +121,7 @@ export const extensionSettingsSchema = z.object({
   npmIdentity: z.string(),
   npmSecret: z.string().optional(),
   requestTimeoutSeconds: z.number().int().min(5).max(300),
+  npmAcceptInvalidCerts: z.boolean(),
   dnsTarget: z.string(),
   defaultLimit: z.number().int().min(0),
   allowLetsencrypt: z.boolean(),
@@ -229,12 +230,14 @@ export const testConnection = async (overrides: {
   npmIdentity?: string;
   npmSecret?: string;
   requestTimeoutSeconds?: number;
+  npmAcceptInvalidCerts?: boolean;
 }): Promise<ConnectionTest> => {
   const { data } = await axiosInstance.post(`${PROXY_ADMIN_BASE}/connection/test`, {
     npm_url: overrides.npmUrl,
     npm_identity: overrides.npmIdentity,
     npm_secret: overrides.npmSecret || undefined,
     request_timeout_seconds: overrides.requestTimeoutSeconds,
+    npm_accept_invalid_certs: overrides.npmAcceptInvalidCerts,
   });
   return parseFromApi(connectionTestSchema, data);
 };

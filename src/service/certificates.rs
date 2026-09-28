@@ -177,15 +177,12 @@ pub async fn issue(ctx: &Ctx, client: &NpmClient, proxy: &mut Proxy) -> Result<(
         return Ok(());
     }
 
-    let version = client.version().await?;
-    let email = client.me().await?.email.unwrap_or_default();
+    // a failed login never reaches certbot - don't count it as an attempt
+    client.server().await?;
     proxy.last_attempt = Some(now);
 
     match client
-        .create_letsencrypt_certificate(
-            &proxy.domain,
-            npm::letsencrypt_meta(&version, &email, dns.as_ref()),
-        )
+        .create_letsencrypt_certificate(&proxy.domain, dns.as_ref())
         .await
     {
         Ok(certificate) => {

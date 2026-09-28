@@ -2,7 +2,7 @@ use super::State;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 mod test {
-    use crate::npm::{NpmClient, readable_error};
+    use crate::npm::{NpmClient, Server, readable_error};
     use serde::{Deserialize, Serialize};
     use shared::{
         ApiError, GetState,
@@ -20,6 +20,7 @@ mod test {
         npm_identity: Option<String>,
         npm_secret: Option<String>,
         request_timeout_seconds: Option<u32>,
+        npm_accept_invalid_certs: Option<bool>,
     }
 
     #[derive(ToSchema, Serialize)]
@@ -81,26 +82,27 @@ mod test {
             data.npm_identity.as_deref().unwrap_or(&stored.npm_identity),
             &secret,
             Duration::from_secs(timeout as u64),
+            data.npm_accept_invalid_certs
+                .unwrap_or(stored.npm_accept_invalid_certs),
         );
 
+        let mut server = None;
         let connected = match &client {
-            Ok(client) => match client.version().await {
+            Ok(client) => match client.server().await {
                 Ok(found) => {
                     version = Some(found.to_string());
-                    check(
-                        &mut checks,
-                        "login",
-                        Ok(()),
-                    );
+                    check(&mut checks, "login", Ok(()));
                     check(
                         &mut checks,
                         "version",
-                        if (found.major, found.minor) >= (2, 10) {
-                            Ok(())
-                        } else {
-                            Err(format!("version {found} is older than 2.10 - please upgrade"))
+                        match &found {
+                            Server::Npm(npm) if (npm.major, npm.minor) < (2, 10) => {
+                                Err(format!("version {npm} is older than 2.10 - please upgrade"))
+                            }
+                            _ => Ok(()),
                         },
                     );
+                    server = Some(found);
                     true
                 }
                 Err(err) => check(&mut checks, "login", Err(readable_error(&err))),
@@ -110,18 +112,21 @@ mod test {
 
         if connected && let Ok(client) = &client {
             let user = client.me().await;
+            // NPMplus registers its acme account with `ACME_EMAIL` instead
+            let npmplus = server.as_ref().is_some_and(Server::is_npmplus);
             check(
                 &mut checks,
                 "user_email",
                 match &user {
                     Ok(user) => match user.email.as_deref().filter(|email| !email.is_empty()) {
-                        Some(found) if found.ends_with("@example.com") => Err(format!(
+                        Some(found) if !npmplus && found.ends_with("@example.com") => Err(format!(
                             "{found} - let's encrypt rejects example.com addresses, set a real email on the api user"
                         )),
                         Some(found) => {
                             email = Some(found.to_string());
                             Ok(())
                         }
+                        None if npmplus => Ok(()),
                         None => Err("the api user has no email - let's encrypt needs one".into()),
                     },
                     Err(err) => Err(readable_error(err)),

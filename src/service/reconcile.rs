@@ -2,7 +2,7 @@
 use super::{Ctx, hosts, invalid, target, wake_worker};
 use crate::{
     db::{CertificateMode, CleanupJob, CleanupTask, Proxy, ProxyStatus},
-    npm::{HostPayload, NpmCertificate, NpmClient, NpmProxyHost},
+    npm::{HostPayload, NpmCertificate, NpmClient, NpmProxyHost, Server},
     rules::marker,
 };
 use serde::Serialize;
@@ -55,6 +55,7 @@ pub struct Expected {
 /// Pure comparison of the expected state with what NPM reports.
 pub fn diff(
     instance_id: &str,
+    server: &Server,
     expected: &[Expected],
     hosts: &[NpmProxyHost],
     certificates: &[NpmCertificate],
@@ -100,7 +101,7 @@ pub fn diff(
                     ))
                 }
                 Some(host) => {
-                    let fields = desired.drift(host);
+                    let fields = desired.drift(host, server);
                     if !fields.is_empty() {
                         items.push(item(
                             ReconcileKind::Drift(fields.iter().map(|f| f.to_string()).collect()),
@@ -212,7 +213,14 @@ pub async fn snapshot(ctx: &Ctx, client: &NpmClient) -> Result<Snapshot, anyhow:
         }
     }
 
-    let items = diff(&ctx.instance_id, &expected, &hosts, &certificates, &owned_certificate_ids);
+    let items = diff(
+        &ctx.instance_id,
+        &client.server().await?,
+        &expected,
+        &hosts,
+        &certificates,
+        &owned_certificate_ids,
+    );
     Ok(Snapshot {
         hosts,
         certificates,
@@ -337,12 +345,21 @@ mod tests {
         }
     }
 
+    fn npm() -> Server {
+        Server::Npm(crate::npm::NpmVersion {
+            major: 2,
+            minor: 15,
+            revision: 1,
+        })
+    }
+
     #[test]
     fn in_sync_reports_nothing() {
         let uuid = Uuid::new_v4();
         let desired = payload("a.example.com", uuid, 80);
         let items = diff(
             INSTANCE,
+            &npm(),
             &[expected(uuid, Some(1), Some(desired.clone()))],
             &[host(1, &desired)],
             &[],
@@ -358,6 +375,7 @@ mod tests {
         let drifted = payload("c.example.com", c, 80);
         let items = diff(
             INSTANCE,
+            &npm(),
             &[
                 expected(a, Some(9), Some(payload("a.example.com", a, 80))),
                 expected(b, Some(2), Some(payload("b.example.com", b, 80))),
@@ -378,7 +396,7 @@ mod tests {
     #[test]
     fn proxies_without_allocation_are_not_missing() {
         let uuid = Uuid::new_v4();
-        let items = diff(INSTANCE, &[expected(uuid, None, None)], &[], &[], &HashSet::new());
+        let items = diff(INSTANCE, &npm(), &[expected(uuid, None, None)], &[], &[], &HashSet::new());
         assert!(items.is_empty());
     }
 
@@ -392,6 +410,7 @@ mod tests {
 
         let items = diff(
             INSTANCE,
+            &npm(),
             &[],
             &[host(1, &ours), host(2, &other), host(3, &unmarked)],
             &[
@@ -416,6 +435,7 @@ mod tests {
         desired.certificate_id = 10;
         let items = diff(
             INSTANCE,
+            &npm(),
             &[],
             &[host(1, &desired)],
             &[cert(10, &marker::cert_nice_name(INSTANCE, Uuid::new_v4()))],
@@ -429,7 +449,7 @@ mod tests {
         let uuid = Uuid::new_v4();
         let mut entry = expected(uuid, None, None);
         entry.certificate_id = Some(5);
-        let items = diff(INSTANCE, &[entry], &[], &[], &HashSet::new());
+        let items = diff(INSTANCE, &npm(), &[entry], &[], &[], &HashSet::new());
         assert_eq!(items[0].id, format!("missing_certificate:{uuid}"));
     }
 }

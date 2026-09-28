@@ -81,7 +81,7 @@ pub async fn push(
             host
         }
         Some(host) => {
-            let drift = desired.drift(&host);
+            let drift = desired.drift(&host, &client.server().await?);
             let mut host = if drift.iter().any(|field| *field != "enabled") {
                 client.update_proxy_host(host.id, &desired).await?
             } else {

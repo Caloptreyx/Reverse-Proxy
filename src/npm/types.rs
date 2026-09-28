@@ -25,6 +25,46 @@ impl std::fmt::Display for NpmVersion {
     }
 }
 
+/// Which proxy manager answers on the configured url.
+#[derive(Debug, Clone)]
+pub enum Server {
+    Npm(NpmVersion),
+    /// NPMplus (github.com/ZoeyVid/NPMplus). Only builds up to mid 2026
+    /// expose their version string without logging in.
+    NpmPlus(Option<String>),
+}
+
+impl Server {
+    /// Identifies the server from its unauthenticated `GET /api/` health
+    /// response: NPM reports a `{major, minor, revision}` version, NPMplus a
+    /// version string (older builds) and its login options.
+    pub fn from_health(body: &serde_json::Value) -> Option<Self> {
+        if body["version"].is_object() {
+            return serde_json::from_value(body["version"].clone())
+                .ok()
+                .map(Self::Npm);
+        }
+        if body["version"].is_string() || body.get("oidc").is_some() {
+            return Some(Self::NpmPlus(body["version"].as_str().map(str::to_string)));
+        }
+        None
+    }
+
+    pub fn is_npmplus(&self) -> bool {
+        matches!(self, Self::NpmPlus(_))
+    }
+}
+
+impl std::fmt::Display for Server {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Npm(version) => write!(f, "Nginx Proxy Manager {version}"),
+            Self::NpmPlus(Some(version)) => write!(f, "NPMplus {version}"),
+            Self::NpmPlus(None) => f.write_str("NPMplus"),
+        }
+    }
+}
+
 #[derive(Deserialize, Debug, Clone)]
 pub struct NpmUser {
     #[serde(default)]
@@ -64,6 +104,11 @@ pub struct NpmProxyHost {
     pub enabled: bool,
     #[serde(default)]
     pub meta: serde_json::Value,
+    /// NPMplus keeps the nginx status in top-level columns instead of `meta`.
+    #[serde(default)]
+    pub npmplus_nginx_online: Option<bool>,
+    #[serde(default)]
+    pub npmplus_nginx_err: Option<String>,
 }
 
 fn default_true() -> bool {
@@ -73,17 +118,20 @@ fn default_true() -> bool {
 impl NpmProxyHost {
     /// `Some(reason)` when NPM reports the generated nginx config as broken.
     pub fn nginx_error(&self) -> Option<String> {
-        if self.meta["nginx_online"].as_bool() == Some(false) {
-            Some(
-                self.meta["nginx_err"]
-                    .as_str()
-                    .filter(|err| !err.is_empty())
-                    .unwrap_or("nginx rejected the generated configuration")
-                    .to_string(),
-            )
-        } else {
-            None
+        let online = self
+            .npmplus_nginx_online
+            .or_else(|| self.meta["nginx_online"].as_bool());
+        if online != Some(false) {
+            return None;
         }
+        Some(
+            self.npmplus_nginx_err
+                .as_deref()
+                .or_else(|| self.meta["nginx_err"].as_str())
+                .filter(|err| !err.is_empty())
+                .unwrap_or("nginx rejected the generated configuration")
+                .to_string(),
+        )
     }
 }
 
@@ -113,6 +161,16 @@ impl NpmCertificate {
     }
 }
 
+/// Host fields NPMplus does not accept (newer builds) or ignores (older
+/// builds): websockets and HTTP/2 are always on, the rest is gone.
+const NPMPLUS_UNSUPPORTED: &[&str] = &[
+    "caching_enabled",
+    "block_exploits",
+    "allow_websocket_upgrade",
+    "http2_support",
+    "access_list_id",
+];
+
 /// The complete desired state of an NPM proxy host. Used both as the
 /// create/update payload and as the reference for drift detection.
 #[derive(Serialize, Debug, Clone, PartialEq)]
@@ -134,8 +192,19 @@ pub struct HostPayload {
 }
 
 impl HostPayload {
+    /// The create/update request body for `server`.
+    pub fn body(&self, server: &Server) -> Result<serde_json::Value, serde_json::Error> {
+        let mut body = serde_json::to_value(self)?;
+        if server.is_npmplus()
+            && let Some(fields) = body.as_object_mut()
+        {
+            fields.retain(|name, _| !NPMPLUS_UNSUPPORTED.contains(&name.as_str()));
+        }
+        Ok(body)
+    }
+
     /// Names of the fields where `host` differs from this desired state.
-    pub fn drift(&self, host: &NpmProxyHost) -> Vec<&'static str> {
+    pub fn drift(&self, host: &NpmProxyHost, server: &Server) -> Vec<&'static str> {
         let mut fields = Vec::new();
         let mut check = |name: &'static str, differs: bool| {
             if differs {
@@ -164,6 +233,9 @@ impl HostPayload {
         );
         check("enabled", !host.enabled);
 
+        if server.is_npmplus() {
+            fields.retain(|name| !NPMPLUS_UNSUPPORTED.contains(name));
+        }
         fields
     }
 }
@@ -213,10 +285,18 @@ mod tests {
         .unwrap()
     }
 
+    fn npm() -> Server {
+        Server::Npm(NpmVersion {
+            major: 2,
+            minor: 15,
+            revision: 1,
+        })
+    }
+
     #[test]
     fn identical_host_has_no_drift() {
         let payload = payload();
-        assert!(payload.drift(&host_from(&payload)).is_empty());
+        assert!(payload.drift(&host_from(&payload), &npm()).is_empty());
     }
 
     #[test]
@@ -227,9 +307,62 @@ mod tests {
         host.hsts_enabled = true;
         host.enabled = false;
         assert_eq!(
-            payload.drift(&host),
+            payload.drift(&host, &npm()),
             vec!["forward_port", "hsts_enabled", "enabled"]
         );
+    }
+
+    #[test]
+    fn npmplus_ignores_fields_it_does_not_manage() {
+        let payload = payload();
+        // newer NPMplus omits the fields, older builds force their own values
+        let mut host: NpmProxyHost = serde_json::from_value(serde_json::json!({
+            "id": 1,
+            "domain_names": payload.domain_names,
+            "forward_scheme": payload.forward_scheme,
+            "forward_host": payload.forward_host,
+            "forward_port": payload.forward_port,
+            "certificate_id": payload.certificate_id,
+            "ssl_forced": payload.ssl_forced,
+            "hsts_enabled": payload.hsts_enabled,
+            "hsts_subdomains": payload.hsts_subdomains,
+            "advanced_config": payload.advanced_config,
+            "enabled": true,
+        }))
+        .unwrap();
+        let plus = Server::NpmPlus(None);
+        assert!(payload.drift(&host, &plus).is_empty());
+        assert!(!payload.drift(&host, &npm()).is_empty());
+
+        host.ssl_forced = false;
+        assert_eq!(payload.drift(&host, &plus), vec!["ssl_forced"]);
+
+        let body = payload.body(&plus).unwrap();
+        for field in NPMPLUS_UNSUPPORTED {
+            assert!(body.get(*field).is_none(), "{field} sent to npmplus");
+        }
+        assert_eq!(body["certificate_id"], 3);
+        assert_eq!(payload.body(&npm()).unwrap()["access_list_id"], 0);
+    }
+
+    #[test]
+    fn server_from_health() {
+        let npm = Server::from_health(&serde_json::json!({
+            "status": "OK", "setup": true, "version": {"major": 2, "minor": 15, "revision": 1}
+        }));
+        assert_eq!(npm.unwrap().to_string(), "Nginx Proxy Manager 2.15.1");
+
+        let older_plus = Server::from_health(&serde_json::json!({
+            "status": "OK", "setup": true, "version": "2026-07-24-r1", "password": true, "oidc": false
+        }));
+        assert_eq!(older_plus.unwrap().to_string(), "NPMplus 2026-07-24-r1");
+
+        let plus = Server::from_health(&serde_json::json!({
+            "status": "OK", "setup": true, "password": true, "oidc": false
+        }));
+        assert!(plus.unwrap().is_npmplus());
+
+        assert!(Server::from_health(&serde_json::json!({"status": "OK"})).is_none());
     }
 
     #[test]
@@ -238,6 +371,17 @@ mod tests {
         assert!(host.nginx_error().is_none());
         host.meta = serde_json::json!({"nginx_online": false, "nginx_err": "bad directive"});
         assert_eq!(host.nginx_error().as_deref(), Some("bad directive"));
+    }
+
+    #[test]
+    fn nginx_error_reads_npmplus_columns() {
+        let mut host = host_from(&payload());
+        host.meta = serde_json::Value::Null;
+        host.npmplus_nginx_online = Some(true);
+        assert!(host.nginx_error().is_none());
+        host.npmplus_nginx_online = Some(false);
+        host.npmplus_nginx_err = Some("unknown directive".into());
+        assert_eq!(host.nginx_error().as_deref(), Some("unknown directive"));
     }
 
     #[test]

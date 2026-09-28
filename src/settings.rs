@@ -31,7 +31,8 @@ impl Default for ProxyDefaults {
 
 #[derive(ToSchema, Validate, Serialize, Deserialize, Clone)]
 pub struct ExtensionSettingsData {
-    /// Base URL of the Nginx Proxy Manager instance, e.g. `http://npm:81`.
+    /// Base URL of the Nginx Proxy Manager or NPMplus instance, e.g.
+    /// `http://npm:81` or `https://npmplus:81`.
     #[garde(length(chars, max = 255))]
     #[schema(max_length = 255)]
     pub npm_url: String,
@@ -48,6 +49,11 @@ pub struct ExtensionSettingsData {
     #[garde(range(min = 5, max = 300))]
     #[schema(minimum = 5, maximum = 300)]
     pub request_timeout_seconds: u32,
+    /// Skip tls verification for the api (NPMplus serves it with a
+    /// self-signed certificate by default).
+    #[garde(skip)]
+    #[serde(default)]
+    pub npm_accept_invalid_certs: bool,
     /// Random id of this panel installation, baked into ownership markers.
     #[garde(skip)]
     #[serde(skip_serializing, default)]
@@ -108,6 +114,7 @@ impl Default for ExtensionSettingsData {
             npm_identity: String::new(),
             npm_secret: None,
             request_timeout_seconds: 30,
+            npm_accept_invalid_certs: false,
             instance_id: String::new(),
             dns_target: String::new(),
             default_limit: 0,
@@ -212,6 +219,7 @@ impl SettingsSerializeExt for ExtensionSettingsData {
             .write_raw_setting("instance_id", &*self.instance_id)
             .write_raw_setting("dns_target", &*self.dns_target)
             .write_serde_setting("request_timeout_seconds", &self.request_timeout_seconds)?
+            .write_serde_setting("npm_accept_invalid_certs", &self.npm_accept_invalid_certs)?
             .write_serde_setting("default_limit", &self.default_limit)?
             .write_serde_setting("allow_letsencrypt", &self.allow_letsencrypt)?
             .write_serde_setting("allow_custom_certificates", &self.allow_custom_certificates)?
@@ -275,6 +283,10 @@ impl SettingsDeserializeExt for ExtensionSettingsDataDeserializer {
             npm_identity: raw("npm_identity"),
             npm_secret,
             request_timeout_seconds: serde_or!("request_timeout_seconds", d.request_timeout_seconds),
+            npm_accept_invalid_certs: serde_or!(
+                "npm_accept_invalid_certs",
+                d.npm_accept_invalid_certs
+            ),
             instance_id: raw("instance_id"),
             dns_target: raw("dns_target"),
             default_limit: serde_or!("default_limit", d.default_limit),

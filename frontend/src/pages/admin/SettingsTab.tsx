@@ -102,6 +102,7 @@ export default function SettingsTab() {
           npmIdentity: settings.npmIdentity,
           npmSecret: settings.npmSecret,
           requestTimeoutSeconds: settings.requestTimeoutSeconds,
+          npmAcceptInvalidCerts: settings.npmAcceptInvalidCerts,
         }),
       );
     } catch (msg) {
@@ -162,6 +163,13 @@ export default function SettingsTab() {
             disabled={!canManage}
           />
         </SimpleGrid>
+        <Switch
+          label={tExt('pages.admin.connection.acceptInvalidCerts', {})}
+          description={tExt('pages.admin.connection.acceptInvalidCertsDescription', {})}
+          checked={settings.npmAcceptInvalidCerts}
+          onChange={(e) => update({ npmAcceptInvalidCerts: e.target.checked })}
+          disabled={!canManage}
+        />
 
         {testResult && (
           <Alert

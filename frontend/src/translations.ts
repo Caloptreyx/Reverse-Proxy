@@ -116,16 +116,21 @@ const translations = defineTranslations({
         connection: {
           title: 'Connection',
           url: 'Instance URL',
-          urlDescription: 'Base URL of the Nginx Proxy Manager API, as reachable from the panel.',
+          urlDescription:
+            'Base URL of the Nginx Proxy Manager or NPMplus API, as reachable from the panel. NPMplus serves it over https.',
           identity: 'Email',
-          identityDescription: "Account used to authenticate against the API. Let's Encrypt needs a real address.",
+          identityDescription:
+            "Account used to authenticate against the API. On Nginx Proxy Manager Let's Encrypt needs a real address, NPMplus uses its ACME_EMAIL instead.",
           secret: 'Password',
           secretDescription: 'Stored encrypted and never shown again.',
           secretStored: 'A password is saved. Leave empty to keep it.',
           timeout: 'Request timeout (seconds)',
           timeoutDescription: 'Seconds before a call to the proxy server is abandoned.',
+          acceptInvalidCerts: 'Accept self-signed certificate',
+          acceptInvalidCertsDescription:
+            'Skip TLS verification for the API. NPMplus uses a self-signed certificate unless DEFAULT_CERT_ID is set. Only enable this on a network you trust.',
           test: 'Test Connection',
-          testOk: 'Connected to NPM {version} as {email}.',
+          testOk: 'Connected to {version} as {email}.',
           testFailed: 'Connection test failed.',
         },
         settings: {

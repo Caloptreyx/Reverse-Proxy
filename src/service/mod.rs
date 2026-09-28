@@ -57,6 +57,7 @@ impl Ctx {
             &self.settings.npm_identity,
             self.settings.npm_secret.as_deref().unwrap_or_default(),
             self.settings.request_timeout(),
+            self.settings.npm_accept_invalid_certs,
         )
     }
 

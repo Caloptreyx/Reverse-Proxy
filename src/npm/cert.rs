@@ -48,6 +48,33 @@ pub fn letsencrypt_meta(
     serde_json::Value::Object(meta)
 }
 
+/// Let's Encrypt request body for NPMplus, which takes the account email
+/// from its `ACME_EMAIL`. Builds since September 2026 moved the DNS challenge
+/// out of `meta` into top-level `npmplus_*` fields (`dns_columns`).
+pub fn npmplus_letsencrypt_body(
+    domain: &str,
+    dns_challenge: Option<&DnsChallenge>,
+    dns_columns: bool,
+) -> serde_json::Value {
+    let mut body = serde_json::json!({
+        "provider": "letsencrypt",
+        "domain_names": [domain],
+    });
+    if let Some(dns) = dns_challenge {
+        let (fields, prefix) = if dns_columns {
+            (&mut body, "npmplus_")
+        } else {
+            body["meta"] = serde_json::json!({});
+            (&mut body["meta"], "")
+        };
+        fields[format!("{prefix}dns_challenge")] = true.into();
+        fields[format!("{prefix}dns_provider")] = dns.provider.into();
+        fields[format!("{prefix}dns_provider_credentials")] = dns.credentials.clone().into();
+        fields[format!("{prefix}propagation_seconds")] = dns.propagation_seconds.into();
+    }
+    body
+}
+
 /// Whether a certificate's names cover `fqdn`: exact match or a single-label
 /// wildcard (`*.example.com` covers `a.example.com`, not `a.b.example.com`).
 pub fn covers_domain(cert_domain_names: &[String], fqdn: &str) -> bool {
@@ -166,6 +193,27 @@ mod tests {
             "# Cloudflare API token\ndns_cloudflare_api_token = tok123\n"
         );
         assert_eq!(meta["propagation_seconds"], 30);
+    }
+
+    #[test]
+    fn npmplus_letsencrypt_body_shapes() {
+        let http = npmplus_letsencrypt_body("a.example.com", None, true);
+        assert_eq!(
+            http,
+            serde_json::json!({"provider": "letsencrypt", "domain_names": ["a.example.com"]})
+        );
+
+        let dns = DnsChallenge::cloudflare("tok123", 30);
+        let columns = npmplus_letsencrypt_body("a.example.com", Some(&dns), true);
+        assert_eq!(columns["npmplus_dns_challenge"], true);
+        assert_eq!(columns["npmplus_dns_provider"], "cloudflare");
+        assert_eq!(columns["npmplus_propagation_seconds"], 30);
+        assert!(columns.get("meta").is_none());
+
+        let meta = npmplus_letsencrypt_body("a.example.com", Some(&dns), false);
+        assert_eq!(meta["meta"]["dns_challenge"], true);
+        assert_eq!(meta["meta"]["dns_provider_credentials"], dns.credentials);
+        assert!(meta.get("npmplus_dns_challenge").is_none());
     }
 
     #[test]
