@@ -124,7 +124,17 @@ statements). A `location` block in a snippet doesn't proxy (it can't use `proxy_
 only useful for `return` or `deny` rules. Stored snippets that no longer pass (for example ones
 with `proxy_pass` or `set`, allowed up to v0.1.5) are left out when the proxy is pushed to NPM.
 
-### Screenshot
+### Screenshots
+
+**Server page**: users see where to point their domain before adding a proxy.
+
+![Reverse Proxies server page](docs/screenshots/server-page.png)
+
+**Create Reverse Proxy**: domain, port, certificate and options.
+
+![Create Reverse Proxy dialog](docs/screenshots/create-proxy.png)
+
+**Admin settings**
 
 ![Settings](docs/screenshots/settings.png)
 
