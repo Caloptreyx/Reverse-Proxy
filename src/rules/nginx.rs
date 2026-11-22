@@ -2,18 +2,21 @@
 //!
 //! Snippets run inside the NPM server block. Only the directives in
 //! [`ALLOWED_DIRECTIVES`] may appear; everything else is rejected, including
-//! every directive that reads or writes files on the proxy host. The snippet
-//! is tokenized the way nginx does it (quotes, escapes, `#` comments, `${`),
-//! so quoting a directive name or hiding it behind a comment doesn't get past
-//! the check. `proxy_pass` stays allowed, so snippets can still reach anything
-//! the proxy can - the admin toggle that enables them says so.
+//! every directive that reads or writes files on the proxy host and every
+//! directive that could send a request somewhere other than the server's
+//! allocation. The snippet is tokenized the way nginx does it (quotes,
+//! escapes, `#` comments, `${`), so quoting a directive name or hiding it
+//! behind a comment doesn't get past the check.
 use super::marker::MARKER_PREFIX;
 
 pub const MAX_LENGTH: usize = 4096;
 
 /// Directives a snippet may use: headers, timeouts, buffering, size limits,
 /// compression, IP allow/deny, rewrites and `location`/`if` blocks. Nothing
-/// here takes a file path.
+/// here takes a file path or picks an upstream: no `proxy_pass` or other
+/// `*_pass`, no subrequests (`mirror`, `auth_request`, `error_page`), and no
+/// `set`, because NPM's default location proxies to
+/// `$forward_scheme://$server:$port`, set just before the snippet.
 pub const ALLOWED_DIRECTIVES: &[&str] = &[
     "add_header",
     "add_trailer",
@@ -65,7 +68,6 @@ pub const ALLOWED_DIRECTIVES: &[&str] = &[
     "proxy_next_upstream",
     "proxy_next_upstream_timeout",
     "proxy_next_upstream_tries",
-    "proxy_pass",
     "proxy_pass_header",
     "proxy_pass_request_body",
     "proxy_pass_request_headers",
@@ -84,7 +86,6 @@ pub const ALLOWED_DIRECTIVES: &[&str] = &[
     "satisfy",
     "send_timeout",
     "server_tokens",
-    "set",
     "set_real_ip_from",
     "sub_filter",
     "sub_filter_last_modified",
@@ -333,9 +334,59 @@ mod tests {
             "proxy_temp_path /data;",
             "error_page 404 /x;",
             "try_files $uri =404;",
-            "location / { proxy_pass http://a; proxy_store on; }",
+            "location / { proxy_set_header X 1; proxy_store on; }",
         ] {
             assert!(validate(config).is_err(), "{config}");
+        }
+    }
+
+    #[test]
+    fn rejects_choosing_the_upstream() {
+        for config in [
+            "proxy_pass http://127.0.0.1:81;",
+            "location / { proxy_pass http://npm:81; }",
+            "location /api { proxy_pass $forward_scheme://$server:$port; }",
+            "if ($request_method = POST) { proxy_pass http://10.0.0.1; }",
+            "\"proxy_pass\" http://169.254.169.254;",
+            "'proxy_pass' http://x;",
+            "prox\\y_pass http://x;",
+            "PROXY_PASS http://x;",
+            "add_header X 1;proxy_pass http://x;",
+            "location / {}proxy_pass http://x;",
+            // NPM's default location proxies to these variables
+            "set $server 127.0.0.1;",
+            "set $port 81;",
+            "set $forward_scheme https;",
+            "if ($host) { set $server \"admin\"; }",
+            "\"set\" $server x;",
+            // other upstream modules
+            "fastcgi_pass 127.0.0.1:9000;",
+            "uwsgi_pass 127.0.0.1:3031;",
+            "scgi_pass 127.0.0.1:4000;",
+            "grpc_pass grpc://127.0.0.1:50051;",
+            "memcached_pass 127.0.0.1:11211;",
+            "upstream x { server 127.0.0.1:81; }",
+            "resolver 127.0.0.1;",
+            // subrequests
+            "mirror /m;",
+            "auth_request /auth;",
+            "error_page 404 = http://127.0.0.1:81/;",
+            "location /m { internal; proxy_pass http://127.0.0.1:81; }",
+            "ssi on;",
+            "add_after_body /x;",
+        ] {
+            assert!(validate(config).is_err(), "{config}");
+        }
+    }
+
+    #[test]
+    fn header_passthrough_is_not_an_upstream() {
+        for config in [
+            "proxy_pass_header Server;",
+            "proxy_pass_request_body off;",
+            "proxy_pass_request_headers on;",
+        ] {
+            assert!(validate(config).is_ok(), "{config}");
         }
     }
 

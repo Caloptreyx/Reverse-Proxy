@@ -91,8 +91,11 @@ Permissions: server `proxies.read|create|update|delete`, admin `proxies.read|man
 ### Custom nginx snippets
 
 With **Allow custom nginx configuration** on, users can add a snippet to each proxy. Only these
-directives are accepted; anything else (`root`, `alias`, `include`, `*_store`, `*_log`,
-`ssl_*`, Lua/JS/Perl, ...) is rejected, so snippets can't read or write files on the NPM host:
+directives are accepted; anything else is rejected. Snippets can't read or write files on the NPM
+host (`root`, `alias`, `include`, `*_store`, `*_log`, `ssl_*`, Lua/JS/Perl, ...), and they can't
+send requests anywhere but the server's allocation: `proxy_pass` and the other `*_pass`
+directives, `upstream`, `resolver`, subrequests (`mirror`, `auth_request`, `error_page`, SSI) and
+`set` (NPM's default location proxies to the `$server`/`$port` variables) are all refused.
 
 - blocks: `location`, `if`
 - headers: `add_header`, `add_trailer`, `more_set_headers`, `more_clear_headers`,
@@ -100,10 +103,10 @@ directives are accepted; anything else (`root`, `alias`, `include`, `*_store`, `
   `proxy_pass_header`, `proxy_ignore_headers`, `proxy_cookie_domain`, `proxy_cookie_path`,
   `proxy_cookie_flags`, `proxy_redirect`, `real_ip_header`, `set_real_ip_from`,
   `real_ip_recursive`, `ignore_invalid_headers`, `underscores_in_headers`, `server_tokens`
-- proxying: `proxy_pass`, `proxy_http_version`, `proxy_method`, `proxy_set_body`,
-  `proxy_pass_request_body`, `proxy_pass_request_headers`, `proxy_intercept_errors`,
-  `proxy_next_upstream`, `proxy_next_upstream_timeout`, `proxy_next_upstream_tries`,
-  `proxy_ssl_name`, `proxy_ssl_server_name`
+- proxying (to the server's allocation only): `proxy_http_version`, `proxy_method`,
+  `proxy_set_body`, `proxy_pass_request_body`, `proxy_pass_request_headers`,
+  `proxy_intercept_errors`, `proxy_next_upstream`, `proxy_next_upstream_timeout`,
+  `proxy_next_upstream_tries`, `proxy_ssl_name`, `proxy_ssl_server_name`
 - timeouts and buffering: `proxy_connect_timeout`, `proxy_read_timeout`, `proxy_send_timeout`,
   `proxy_buffering`, `proxy_buffer_size`, `proxy_buffers`, `proxy_busy_buffers_size`,
   `proxy_request_buffering`, `proxy_max_temp_file_size`, `client_max_body_size`,
@@ -113,12 +116,13 @@ directives are accepted; anything else (`root`, `alias`, `include`, `*_store`, `
 - content: `gzip`, `gzip_comp_level`, `gzip_disable`, `gzip_min_length`, `gzip_proxied`,
   `gzip_types`, `gzip_vary`, `sub_filter`, `sub_filter_once`, `sub_filter_types`,
   `sub_filter_last_modified`, `charset`, `default_type`, `expires`, `etag`, `if_modified_since`
-- access and rewrites: `allow`, `deny`, `satisfy`, `return`, `rewrite`, `set`, `break`
+- access and rewrites: `allow`, `deny`, `satisfy`, `return`, `rewrite`, `break`
 
 Snippets are parsed the way nginx parses them, so quoting a directive name or hiding it behind a
 comment doesn't get past the check, and a snippet must be complete (closed quotes, braces and
-statements). `proxy_pass` can still reach anything the NPM host can, so only enable snippets for
-users you trust. Stored snippets that no longer pass are left out when the proxy is pushed to NPM.
+statements). A `location` block in a snippet doesn't proxy (it can't use `proxy_pass`), so it is
+only useful for `return` or `deny` rules. Stored snippets that no longer pass (for example ones
+with `proxy_pass` or `set`, allowed up to v0.1.5) are left out when the proxy is pushed to NPM.
 
 ### Screenshot
 
