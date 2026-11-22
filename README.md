@@ -5,7 +5,7 @@ of their server's ports through **Nginx Proxy Manager** or **[NPMplus](https://g
 with automatic **Let's Encrypt** certificates. Users add their own domain (or pick a managed
 subdomain), choose a port, done.
 
-Package name: `dev.caloptreyx.reverseproxy` · Requires panel `>=1.2.2` · Tested with Nginx Proxy
+Package name: `dev.caloptreyx.reverseproxy` · Requires panel `>=1.2.10` · Tested with Nginx Proxy
 Manager 2.15 (2.10+ supported) and NPMplus 2026-07-24-r1 plus its September 2026 development
 builds (the flavor is detected automatically)
 
@@ -14,7 +14,7 @@ builds (the flavor is detected automatically)
 - Custom domains or managed subdomains, pointed at any of the server's allocations
 - Automatic HTTPS with Let's Encrypt, their own uploaded certificate, or plain HTTP only
 - WebSockets, caching, HTTP/2, HSTS, force-HTTPS and exploit blocking per proxy
-- Optional custom nginx snippets (admin opt-in)
+- Optional custom nginx snippets (admin opt-in, [allowlisted directives](#custom-nginx-snippets))
 - Clear status at a glance - *live*, *issuing*, *waiting for DNS* or *failed* with a readable reason
 - Retry themselves instead of opening a ticket
 
@@ -87,6 +87,38 @@ Tabs:
   deletions
 
 Permissions: server `proxies.read|create|update|delete`, admin `proxies.read|manage`.
+
+### Custom nginx snippets
+
+With **Allow custom nginx configuration** on, users can add a snippet to each proxy. Only these
+directives are accepted; anything else (`root`, `alias`, `include`, `*_store`, `*_log`,
+`ssl_*`, Lua/JS/Perl, ...) is rejected, so snippets can't read or write files on the NPM host:
+
+- blocks: `location`, `if`
+- headers: `add_header`, `add_trailer`, `more_set_headers`, `more_clear_headers`,
+  `more_set_input_headers`, `more_clear_input_headers`, `proxy_set_header`, `proxy_hide_header`,
+  `proxy_pass_header`, `proxy_ignore_headers`, `proxy_cookie_domain`, `proxy_cookie_path`,
+  `proxy_cookie_flags`, `proxy_redirect`, `real_ip_header`, `set_real_ip_from`,
+  `real_ip_recursive`, `ignore_invalid_headers`, `underscores_in_headers`, `server_tokens`
+- proxying: `proxy_pass`, `proxy_http_version`, `proxy_method`, `proxy_set_body`,
+  `proxy_pass_request_body`, `proxy_pass_request_headers`, `proxy_intercept_errors`,
+  `proxy_next_upstream`, `proxy_next_upstream_timeout`, `proxy_next_upstream_tries`,
+  `proxy_ssl_name`, `proxy_ssl_server_name`
+- timeouts and buffering: `proxy_connect_timeout`, `proxy_read_timeout`, `proxy_send_timeout`,
+  `proxy_buffering`, `proxy_buffer_size`, `proxy_buffers`, `proxy_busy_buffers_size`,
+  `proxy_request_buffering`, `proxy_max_temp_file_size`, `client_max_body_size`,
+  `client_body_buffer_size`, `client_body_timeout`, `client_header_buffer_size`,
+  `client_header_timeout`, `large_client_header_buffers`, `keepalive_requests`,
+  `keepalive_timeout`, `send_timeout`, `chunked_transfer_encoding`
+- content: `gzip`, `gzip_comp_level`, `gzip_disable`, `gzip_min_length`, `gzip_proxied`,
+  `gzip_types`, `gzip_vary`, `sub_filter`, `sub_filter_once`, `sub_filter_types`,
+  `sub_filter_last_modified`, `charset`, `default_type`, `expires`, `etag`, `if_modified_since`
+- access and rewrites: `allow`, `deny`, `satisfy`, `return`, `rewrite`, `set`, `break`
+
+Snippets are parsed the way nginx parses them, so quoting a directive name or hiding it behind a
+comment doesn't get past the check, and a snippet must be complete (closed quotes, braces and
+statements). `proxy_pass` can still reach anything the NPM host can, so only enable snippets for
+users you trust. Stored snippets that no longer pass are left out when the proxy is pushed to NPM.
 
 ### Screenshot
 

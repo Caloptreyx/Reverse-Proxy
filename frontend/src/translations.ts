@@ -98,7 +98,7 @@ const translations = defineTranslations({
           options: 'Options',
           advancedConfig: 'Custom nginx configuration',
           advancedConfigDescription:
-            'Extra nginx directives for this proxy, e.g. client_max_body_size. File access and scripting directives are not allowed.',
+            'Extra nginx directives for this proxy, e.g. client_max_body_size or proxy_set_header. Only an allowlist of header, timeout, buffering, compression, access and rewrite directives (plus location and if blocks) is accepted; nothing that reads or writes files.',
         },
         deleteModal: {
           title: 'Delete Reverse Proxy',
@@ -161,7 +161,7 @@ const translations = defineTranslations({
           allowCustomCertificatesDescription: 'Let users paste their own certificate and private key.',
           allowCustomNginx: 'Allow custom nginx configuration',
           allowCustomNginxDescription:
-            'Snippets run inside the proxy server and can point requests anywhere it can reach, so only enable this for users you trust.',
+            'Snippets are limited to an allowlist of safe directives (see the README), but run inside the proxy server and can point requests anywhere it can reach, so only enable this for users you trust.',
           defaultsTitle: 'Defaults',
           defaultLimit: 'Default domain limit',
           defaultLimitDescription: 'Applied to newly created servers.',

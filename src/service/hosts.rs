@@ -12,10 +12,18 @@ pub fn desired(ctx: &Ctx, proxy: &Proxy, target: &target::Target) -> HostPayload
     let certificate_id = proxy.certificate_id().unwrap_or(0);
     let tls = certificate_id > 0;
     let flags = &proxy.flags;
-    let custom = if ctx.settings.allow_custom_nginx {
-        proxy.advanced_config.as_str()
-    } else {
+    // snippets saved under older, looser rules are checked again so they
+    // stop reaching NPM
+    let custom = if !ctx.settings.allow_custom_nginx {
         ""
+    } else if let Err(reason) = nginx::validate(&proxy.advanced_config) {
+        tracing::warn!(
+            proxy = %proxy.uuid,
+            "not applying stored custom nginx configuration: {reason}"
+        );
+        ""
+    } else {
+        proxy.advanced_config.as_str()
     };
 
     HostPayload {
