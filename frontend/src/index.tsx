@@ -10,7 +10,7 @@ import { getExtTranslations } from './translations.ts';
 
 class CaloptreyxReverseProxyExtension extends Extension {
   public cardConfigurationPage: React.FC | null = AdminConfigurationPage;
-  public cardIcon: React.ReactNode = <FontAwesomeIcon icon={faShieldHalved} />;
+  public cardIcon = <FontAwesomeIcon icon={faShieldHalved} />;
 
   public initialize(ctx: ExtensionContext): void {
     ctx.extensionRegistry.enterRoutes((routes) =>
